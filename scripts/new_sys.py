@@ -6,6 +6,8 @@ bin_low = 200
 bin_hi = 2000
 nbins = (bin_hi - bin_low)/20
 
+inflate_sys = True
+
 def create_sys_hist(h_nominal, h_org_sys, hist_name):
     print hist_name, h_nominal.GetNbinsX(), h_org_sys.GetNbinsX()
     h_sys = h_nominal.Clone(hist_name+"_times")
@@ -74,12 +76,16 @@ def produce_13TeV_template( tag_name = "HKHI" ):
     h_reducible_sys = fin.Get("bkg_reducible_syst_gg_full").Clone("bkg_reducible_syst_gg")
     h_irreducible_sys = fin.Get("bkg_irreducible_syst_gg_full").Clone("bkg_irreducible_syst_gg")
 
-    h_purity_sys.Rebin(5).Scale(1./5)
-    h_reducible_sys.Rebin(5).Scale(1./5)
+
     ## inflat irreducible uncertainty by factor of 10
     # so that it closes to stats uncertainty in data
-    #h_irreducible_sys.Rebin(5).Scale(1./5)
-    h_irreducible_sys.Rebin(5).Scale(10./5)
+    sf = 1
+    if inflate_sys:
+        sf = 10
+
+    h_purity_sys.Rebin(5).Scale(sf/5)
+    h_irreducible_sys.Rebin(5).Scale(sf/5)
+    h_reducible_sys.Rebin(5).Scale(sf/5)
     
     #write down sys and nominal
     fout.cd()

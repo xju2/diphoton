@@ -193,7 +193,7 @@ def plot_overall(file_name = "hists_input_HKHI.root", is_8TeV = False):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 1: 
+    if len(sys.argv) < 2: 
         print sys.argv[0]," hist_input is_8TeV"
         sys.exit(1)
 
