@@ -8,7 +8,7 @@ from new_sys import truncate_hist
 
 ROOT.gROOT.SetBatch()
 if not hasattr(ROOT, "myLegend"):
-    ROOT.gROOT.LoadMacro("/afs/cern.ch/user/x/xju/tool/loader.c") 
+    ROOT.gROOT.LoadMacro("$HZZWSCODEDIR/scripts/loader.c") 
 
 def plot_frame(f1_name, f2_name):
     f1 = ROOT.TFile.Open(f1_name, "read")
@@ -37,7 +37,8 @@ def overlay( f_func = "out_function.root",
     if "HKHI" in tag: 
         h_bkg_fitted_template = f2.Get("hist_bkg_inclusive_13TeV__obs_x_chan_HKHI_13TeV").Rebin(4)
     else:
-        h_bkg_fitted_template = f2.Get("hist_bkg_inclusive_13TeV__obs_x_channel").Rebin(4)
+        #h_bkg_fitted_template = f2.Get("hist_bkg_inclusive_13TeV__obs_x_channel").Rebin(4)
+        h_bkg_fitted_template = f2.Get("hist_bkg_inclusive_13TeV__atlas_invMass")
     h_bkg_fitted_template.SetLineColor(2)
     h_bkg_fitted_template.GetXaxis().SetTitle("m_{#gamma#gamma} [GeV]")
     h_template_error_band = f2.Get(frame_name)
@@ -207,8 +208,7 @@ def overlay( f_func = "out_function.root",
     f2.Close()
     f3.Close()
 
-
-if __name__ == "__main__":
+def run():
     #plot_frame("out_template.root", "out_function.root")
     paras = [
         #("EKEI", "frame_atlas_invMass_2d61800"), 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
         #("EKEI", "frame_obs"), 
         ("EKHI", "frame_obs"), 
-        ("HKHI", "frame_obs")
+        #("HKHI", "frame_obs")
     ]
     is_splusb = True
     for par in paras:
@@ -228,3 +228,43 @@ if __name__ == "__main__":
                 frame_name, 
                 is_splusb
             )
+
+def get_error(file_name, bound):
+    f1 = ROOT.TFile.Open(file_name, "read")
+    gr_norm = f1.Get("nominal")
+    gr_error = f1.Get("error_band")
+    gr_norm.RemovePoint(3)
+    #ROOT.print_graph(gr_norm)
+
+    bin_width = 5.0
+    nbins = int((bound[1]- bound[0])/bin_width)
+    norm = ROOT.sum_graph_entries(gr_norm, bound[0], bound[1], nbins)
+    error = ROOT.sum_graph_entries(gr_error, bound[0], bound[1], nbins)
+    error -= norm
+    
+    f1.Close()
+    
+    return (norm, error)
+
+def compare_error(f1_name, f2_name, bound):
+    norm_with_sys, error_with_sys = get_error(f1_name, bound)
+    norm_no_sys, error_no_sys = get_error(f2_name, bound)
+    try:
+        sys_error = math.sqrt(error_with_sys**2 - error_no_sys**2)
+    except ValueError:
+        sys_error = -99
+    print "norm: [",bound[0],",",bound[1],"] GeV"
+    print "\t all sys: {:.4f}".format(norm_with_sys)
+    print "\t no sys: {:.4f}".format(norm_no_sys)
+    print "error: "
+    print "\t all: {:.4f}".format(error_with_sys)
+    print "\t stats: {:.4f}".format(error_no_sys)
+    print "\t sys: {:.4f}".format(sys_error)
+
+    
+if __name__ == "__main__":
+    compare_error("out_hist_allsys.root", "out_hist_nosys.root", (200, 2000))
+    compare_error("out_hist_allsys.root", "out_hist_nosys.root", (240, 360))
+    compare_error("out_hist_allsys.root", "out_hist_nosys.root", (610, 890))
+    compare_error("out_hist_allsys.root", "out_hist_nosys.root", (1150, 1850))
+    #run()

@@ -65,10 +65,9 @@ def read_MxAOD():
     f_out = ROOT.TFile.Open("test.root", 'recreate')
     ## 2D histogram storing: 
     ## BB BE EB EE x EKEI EKHI HKEI HKHI
-    #h_myy_2D = ROOT.TH2F("h_myy_2D", "inv mass", 100, 100, 2100, 
-    #                       16, 0.5, 16.5)
     h_myy_2D = ROOT.TH2F("h_myy_2D", "inv mass", 36, 200, 2000, 
-                           16, 0.5, 16.5)
+                           17, -0.5, 16.5)
+    h_myy_all = ROOT.TH1F("h_myy_all", "inv mass", 36, 200, 2000)
 
     for ientry in xrange(nentries):
         tree.GetEntry(ientry)
@@ -109,6 +108,7 @@ def read_MxAOD():
         
         if br_passTight and br_passEK and br_passEI:
             h_myy_2D.Fill(br_myy/1E3, y_index, weights)
+            h_myy_all.Fill(br_myy/1E3, weights)
         elif br_passTight and br_passEK and br_passHI:
             h_myy_2D.Fill(br_myy/1E3, y_index+4, weights)
         elif br_passTight and br_passHK and br_passEI:
@@ -120,6 +120,7 @@ def read_MxAOD():
 
     f_out.cd()
     h_myy_2D.Write()
+    h_myy_all.Write()
     f_out.Close()
 
     f_in.Close()
