@@ -3,8 +3,8 @@
 import ROOT
 
 bin_low = 200
-bin_hi = 2000
-nbins = (bin_hi - bin_low)/20
+bin_hi = 3500
+nbins = (bin_hi - bin_low)/5
 
 inflate_sys = True
 
@@ -68,7 +68,7 @@ def produce_8TeV_template():
 def produce_13TeV_template( tag_name = "HKHI" ):
     file_name = "inputs/BkgEstimation_Lin/BkgEstimation_NONE_TOPO_PTDEP_"+tag_name+"_Lin.root"
     fin = ROOT.TFile.Open(file_name, "read")
-    h_nom = fin.Get("bkg_total_gg_full").Clone("bkg_nominal")
+    h_nom = fin.Get("bkg_total_gg_full").Clone("bkg_nominal_old")
     h_nom.Rebin(5)
     fout = ROOT.TFile.Open("hists_input_"+tag_name+".root", "recreate")
 
@@ -76,7 +76,9 @@ def produce_13TeV_template( tag_name = "HKHI" ):
     h_reducible_sys = fin.Get("bkg_reducible_syst_gg_full").Clone("bkg_reducible_syst_gg")
     h_irreducible_sys = fin.Get("bkg_irreducible_syst_gg_full").Clone("bkg_irreducible_syst_gg")
 
-
+    file_iso = "isolation_sys/hist.root"
+    fin2 = ROOT.TFile.Open(file_iso, "read")
+    h_iso_sys = fin2.Get("bkg_isolation_syst_gg")
     ## inflat irreducible uncertainty by factor of 10
     # so that it closes to stats uncertainty in data
     sf = 1
@@ -86,26 +88,36 @@ def produce_13TeV_template( tag_name = "HKHI" ):
     h_purity_sys.Rebin(5).Scale(sf/5)
     h_irreducible_sys.Rebin(5).Scale(sf/5)
     h_reducible_sys.Rebin(5).Scale(sf/5)
+    h_iso_sys.Scale(sf)
+
+    ## truncate the histograms to [200, 2000] GeV
+    h_nom_new = truncate_hist(h_nom, "bkg_nominal")
+    h_purity_sys_new = truncate_hist(h_purity_sys, "h_purity_sys_new")
+    h_irreducible_sys_new = truncate_hist(h_irreducible_sys, "h_irreducible_sys_new")
+    h_reducible_sys_new = truncate_hist(h_reducible_sys, "h_reducible_sys_new")
     
     #write down sys and nominal
     fout.cd()
-    h_nom.Write()
-    h_purity_sys.Write()
-    h_reducible_sys.Write()
-    h_irreducible_sys.Write()
+    h_nom_new.Write()
+    h_purity_sys_new.Write()
+    h_reducible_sys_new.Write()
+    h_irreducible_sys_new.Write()
 
-    h_purity_up, h_purity_down = create_sys_hist(h_nom, h_purity_sys, "purity_sys")
+    h_purity_up, h_purity_down = create_sys_hist(h_nom_new, h_purity_sys_new, "purity_sys")
     h_purity_up.Write()
     h_purity_down.Write()
 
-    h_red_up, h_red_down = create_sys_hist(h_nom, h_reducible_sys, "reducible_sys")
+    h_red_up, h_red_down = create_sys_hist(h_nom_new, h_reducible_sys_new, "reducible_sys")
     h_red_up.Write()
     h_red_down.Write()
 
-    h_irred_up, h_irred_down = create_sys_hist(h_nom, h_irreducible_sys, "irreducible_sys")
+    h_irred_up, h_irred_down = create_sys_hist(h_nom_new, h_irreducible_sys_new, "irreducible_sys")
     h_irred_up.Write()
     h_irred_down.Write()
 
+    h_iso_up, h_iso_down = create_sys_hist(h_nom_new, h_iso_sys, "isolation_sys")
+    h_iso_up.Write()
+    h_iso_down.Write()
 
     fin.Close()
     fout.Close()

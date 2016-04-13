@@ -80,6 +80,7 @@ def create_hist_from_ws(ws, tag_name, hist_name):
     pdf = ws.obj(tag_name+"_model")
     pdf.Print()
     obs = ws.var("obs_x_"+tag_name)
+    obs.Print()
     #obs.setRange(200, 3500)
     #nbins = 660
     #bkg_f1 = pdf.createHistogram(hist_name, obs, ROOT.RooFit.Binning(nbins))
@@ -91,42 +92,56 @@ def compare_ws_ws(f1_name, f2_name):
     f2 = ROOT.TFile.Open(f2_name, "read") ## mine
     if not f1 or not f2: return None
 
-    f3_name = "Bkg_Total_allcat_TOPO_PTDEP_8.0_lead50_sublead50_norm17_62_linear.root"
+    #f3_name = "Bkg_Total_allcat_TOPO_PTDEP_8.0_lead50_sublead50_norm17_62_linear.root"
+    f3_name = "BkgEstimation_Lin/BkgEstimation_NONE_TOPO_PTDEP_HKHI_Lin.root"
     f3 = ROOT.TFile.Open(f3_name, "read")
-    bkg_f3_org = f3.Get("bkg_total_gg_full")
+    bkg_f3_org = f3.Get("bkg_total_gg_full").Rebin(5)
     bkg_f3 = new_sys.truncate_hist(bkg_f3_org, "bkg_f3")
+
+    f4_name = "ruggero_template/BkgEstimation_NONE_NONE_TOPO_PTDEP_HKHI_Lin.root"
+    f4 = ROOT.TFile.Open(f4_name, "read")
+    bkg_f4 = f4.Get("bkg_total_gg_full")
 
     ws1 = f1.Get("combined")
     ws2 = f2.Get("combined")
 
     bkg_f1 = create_hist_from_ws(ws1, "channel", "bkg_f1")
-    bkg_f2 = create_hist_from_ws(ws2, "chan_8TeV", "bkg_f2")
+    #bkg_f2 = create_hist_from_ws(ws2, "chan_8TeV", "bkg_f2")
+    bkg_f2 = create_hist_from_ws(ws2, "chan_HKHI_13TeV", "bkg_f2")
 
     bkg_f1.Scale(bkg_f2.Integral()/bkg_f1.Integral())
     bkg_f3.Scale(bkg_f2.Integral()/bkg_f3.Integral())
+    bkg_f4.Scale(bkg_f2.Integral()/bkg_f4.Integral())
 
     bkg_f1.SetLineColor(2)
     bkg_f2.SetLineColor(4)
+    bkg_f4.SetLineColor(8)
+
     bkg_f1.SetMarkerSize(0)
     bkg_f2.SetMarkerSize(0)
     bkg_f3.SetMarkerSize(0)
+    bkg_f4.SetMarkerSize(0)
 
+    print bkg_f1.GetNbinsX(),bkg_f2.GetNbinsX(),bkg_f3.GetNbinsX(),bkg_f4.GetNbinsX()
     canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
     #canvas.SetLogy()
     h_bkgs = ROOT.TList()
     h_bkgs.Add(bkg_f1)
     h_bkgs.Add(bkg_f2)
+    h_bkgs.Add(bkg_f4)
     c1 = ROOT.add_ratio_pad(bkg_f3, h_bkgs)
     c1.SetLogy()
     bkg_f1.Draw()
     bkg_f2.Draw("same")
     bkg_f3.Draw("same")
+    bkg_f4.Draw("same")
 
 
     legend = ROOT.myLegend(0.7, 0.8, 0.9, 0.9)
     legend.AddEntry( bkg_f1, "Rugero", "L")
     legend.AddEntry( bkg_f2, "XY", "L")
     legend.AddEntry( bkg_f3, "input hist", "L")
+    legend.AddEntry( bkg_f4, "new hist", "L")
     legend.Draw()
     canvas.SaveAs(f1_name.replace("root", "pdf"))
 
@@ -148,5 +163,8 @@ def test2():
 
 if __name__ == "__main__":
     #test1()
-    compare_ws_ws("bkg_histFitter_ws_8tev.root",
-                  "results/test_8TeV_combined_meas_model.root")
+    #compare_ws_ws("bkg_histFitter_ws_8tev.root",
+    #              "results/test_8TeV_combined_meas_model.root")
+    compare_ws_ws("ruggero_template/bkg_histFitter_ws_13TeV_HKHI.root",
+                  "../bkg_histofactory_13TeV/results/HKHI_13TeV_combined_meas_model_nominal.root")
+

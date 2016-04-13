@@ -51,6 +51,10 @@ def geo21_geo20_func():
     function.SetParameter(1, +6.3822E-5)
     return function
 
+def isolation_func():
+    pass
+#    function = ROOT.
+
 def get_fine_hist(hist_name, func):
     hist = ROOT.TH1F(hist_name, "hist", nbins, bin_low, bin_hi)
     for i in range(nbins):

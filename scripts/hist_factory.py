@@ -29,6 +29,8 @@ def main( input_file = "./data/new_sys.root", analysis_tag = "Nominal_8TeV",
                     "irreducible_sys_up", input_file, "")
     bkg.AddHistoSys("bkg_reducible","reducible_sys_down", input_file, "",
                     "reducible_sys_up", input_file, "")
+    bkg.AddHistoSys("bkg_isolation","isolation_sys_down", input_file, "",
+                    "isolation_sys_up", input_file, "")
     if with_geo:
         bkg.AddHistoSys("geo","geo_sys_down", input_file, "",
                     "geo_sys_up", input_file, "")
