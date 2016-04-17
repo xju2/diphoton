@@ -7,12 +7,13 @@ from ROOT import RooArgSet, RooArgList, RooFit
 if not hasattr(ROOT, "myLegend"):
     ROOT.gROOT.LoadMacro("/Users/xju/Documents/Programs/hzzws/scripts/loader.c")
 
+ROOT.gROOT.SetBatch(True)
 class HistHandler:
     def __init__(self):
         print "HistHandler create"
         self.OBS_NAME = "obs"
         self.ws = ROOT.RooWorkspace("combined", "combined")
-        self.analysis = "EKHI"
+        self.analysis = "EK"
         self.OUTPUT_NAME = "ws_"+self.analysis+".root"
         self.out_file = ROOT.TFile.Open(self.OUTPUT_NAME, "recreate")
 
@@ -132,7 +133,7 @@ class HistHandler:
     def get_1D_hists(self, hist_2d):
         """
         get projection for EKEI (1-4), EKHI (5-8)
-        HKEI (9-12), HKHI (13-16)
+        HKEI (9-12), HKHI (13-16), EK(17-20), HK(21-24)
         """
         if self.analysis == "EKEI":
             Y_START = 1
@@ -146,24 +147,35 @@ class HistHandler:
         elif self.analysis == "HKHI":
             Y_START = 13
             Y_END = 16
+        elif self.analysis == "EK":
+            Y_START = 17
+            Y_END = 20
+        elif self.analysis == "HK":
+            Y_START = 21
+            Y_END = 24
         else:
-            Y_START = 1
-            Y_END = 16
+            Y_START = 17
+            Y_END = 20
 
         h1 = hist_2d.ProjectionX(hist_2d.GetName()+"_px", Y_START, Y_END)
         return h1
 
-    def get_hists(self, file_name):
+    def get_hists(self, file_name, DO_2D=False):
         """ """
         fin = ROOT.TFile.Open(file_name, "read")
-        LEADING_2D_HIST_NAME = "h_leading_etcone40_2D"
-        SUBLEADING_2D_HIST_NAME = "h_subleading_etcone40_2D"
-        h2d_leading = fin.Get(LEADING_2D_HIST_NAME)
-        h2d_subleading = fin.Get(SUBLEADING_2D_HIST_NAME)
-        if not h2d_leading or not h2d_subleading:
-            print "cannot find hist in", file_name
-        h1d_leading = self.get_1D_hists(h2d_leading)
-        h1d_subleading = self.get_1D_hists(h2d_subleading)
+        if DO_2D:
+            LEADING_2D_HIST_NAME = "h_leading_etcone40_2D"
+            SUBLEADING_2D_HIST_NAME = "h_subleading_etcone40_2D"
+            h2d_leading = fin.Get(LEADING_2D_HIST_NAME)
+            h2d_subleading = fin.Get(SUBLEADING_2D_HIST_NAME)
+            h1d_leading = self.get_1D_hists(h2d_leading)
+            h1d_subleading = self.get_1D_hists(h2d_subleading)
+            if not h2d_leading or not h2d_subleading:
+                print "cannot find hist in", file_name
+        else:
+            h1d_leading = fin.Get("leading_jet")
+            h1d_subleading = fin.Get("subleading_jet")
+
         if not h1d_leading or not h1d_subleading:
             print "cannot find projection"
             return None
@@ -180,49 +192,77 @@ class HistHandler:
         jj_leading, jj_subleading = self.get_hists(fjj_name)
         data_leading, data_subleading = self.get_hists(fdata_name)
 
+        pythia_file_name = "gg_template_pythia.root"
+        sherpa_file_name = "gg_template_sharpa.root"
+        gg_pythia_leading, gg_pythia_subleading = self.get_hists(pythia_file_name, True)
+        gg_sherpa_leading, gg_sherpa_subleading = self.get_hists(sherpa_file_name, True)
+        generator_leading = {
+            "data": data_leading,
+            "pythia":gg_pythia_leading,
+            "sherpa":gg_sherpa_leading,
+            "bkg template": jj_leading,
+        }
+        generator_subleading = {
+            "data": data_subleading,
+            "pythia":gg_pythia_subleading,
+            "sherpa":gg_sherpa_subleading,
+            "bkg template": jj_subleading,
+        }
+        self.compare_hists(generator_leading, "leading_gg")
+        self.compare_hists(generator_subleading, "subleading_gg")
+
         # check the distributions
-        self.compare_hists(gg_leading, jj_leading, data_leading, "leading")
-        self.compare_hists(gg_subleading, jj_subleading,
-                           data_subleading, "subleading")
+        component_leading = {
+            "data": data_leading,
+            "#gamma": gg_leading,
+            "jet": jj_leading
+        }
+        component_subleading = {
+            "data": data_leading,
+            "#gamma": gg_leading,
+            "jet": jj_leading
+        }
+        self.compare_hists(component_leading, "leading")
+        self.compare_hists(component_subleading, "subleading")
 
         self.get_combined_ws(gg_leading, gg_subleading,
                              jj_leading, jj_subleading,
                              data_leading, data_subleading)
 
-    def compare_hists(self, h_gg, h_jj, h_data, out_name):
+    def compare_hists(self, hist_dict, out_name):
         """
         compare the two templates with the data
         They are scaled to unit
         """
         canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
         # rebin histograms for comparison only!
-        num_rebin = 2
-        h_data.Rebin(num_rebin)
-        h_gg.Rebin(num_rebin)
-        h_jj.Rebin(num_rebin)
-
         # scale all histograms to unit
-        h_gg.Scale(1./h_gg.Integral())
-        h_jj.Scale(1./h_jj.Integral())
-        h_data.Scale(1./h_data.Integral())
-        max_y = max([h_gg.GetMaximum(), h_jj.GetMaximum(),
-                     h_data.GetMaximum()])
-        h_data.GetYaxis().SetRangeUser(0., max_y*1.1)
+        num_rebin = 2
+        for name, hist in hist_dict.iteritems():
+            if hist is None: continue
+            hist.Rebin(num_rebin)
+            hist.Scale(1./hist.Integral())
 
-        # cosmetic setup
-        h_data.SetLineColor(1)
-        h_gg.SetLineColor(2)
-        h_jj.SetLineColor(4)
+        max_y = max([x.GetMaximum() for x in hist_dict.itervalues()])
 
-
-        h_data.Draw()
-        h_gg.Draw("same")
-        h_jj.Draw("same")
-
+        # start to plot histgorams
+        num_count = 0
+        color_list = [2, 4, ROOT.kGreen+1, ROOT.kOrange+6, ROOT.kViolet-3]
         legend = ROOT.myLegend(0.6, 0.6, 0.8, 0.8)
-        legend.AddEntry(h_data, "data", "L")
-        legend.AddEntry(h_gg, "#gamma", "L")
-        legend.AddEntry(h_jj, "jet", "L")
+        X_TITLE = "E_{T}^{iso} - 0.022 #times E_{T} [GeV]"
+        for name, hist in hist_dict.iteritems():
+            if hist is None: continue
+            hist.SetLineColor(color_list[num_count])
+            hist.SetLineWidth(2)
+            hist.SetMarkerSize(0)
+            if num_count == 0:
+                hist.GetYaxis().SetRangeUser(0., max_y*1.1)
+                hist.GetXaxis().SetTitle(X_TITLE)
+                hist.Draw("HIST")
+            else:
+                hist.Draw("same HIST")
+            legend.AddEntry(hist, name, "L")
+            num_count += 1
         legend.Draw()
         ROOT.myText(0.6, 0.85, 1, self.analysis)
         canvas.SaveAs(self.analysis+"_"+out_name+".pdf")
