@@ -6,7 +6,7 @@ bin_low = 200
 bin_hi = 3500
 nbins = (bin_hi - bin_low)/5
 
-inflate_sys = True
+INFLATE_SYS = False
 
 def create_sys_hist(h_nominal, h_org_sys, hist_name):
     print hist_name, h_nominal.GetNbinsX(), h_org_sys.GetNbinsX()
@@ -65,43 +65,54 @@ def produce_8TeV_template():
     f2.Close()
     f3.Close()
 
-def produce_13TeV_template( tag_name = "HKHI" ):
+def produce_13TeV_template(tag_name="HKHI"):
+    """
+    generate inputs for histofactory.
+    It will look for directory: inputs/BkgEstimation_Lin/
+    """
+    num_rebin = 1
     file_name = "inputs/BkgEstimation_Lin/BkgEstimation_NONE_TOPO_PTDEP_"+tag_name+"_Lin.root"
+    print "Input: ", file_name
     fin = ROOT.TFile.Open(file_name, "read")
     h_nom = fin.Get("bkg_total_gg_full").Clone("bkg_nominal_old")
-    h_nom.Rebin(5)
+    h_nom.Rebin(num_rebin)
     fout = ROOT.TFile.Open("hists_input_"+tag_name+".root", "recreate")
 
     h_purity_sys = fin.Get("bkg_purity_syst_gg_full").Clone("bkg_purity_syst_gg")
     h_reducible_sys = fin.Get("bkg_reducible_syst_gg_full").Clone("bkg_reducible_syst_gg")
     h_irreducible_sys = fin.Get("bkg_irreducible_syst_gg_full").Clone("bkg_irreducible_syst_gg")
+    h_iso_sys = fin.Get("bkg_iso_syst_gg_full").Clone("bkg_iso_syst_gg")
 
-    file_iso = "isolation_sys/hist.root"
-    fin2 = ROOT.TFile.Open(file_iso, "read")
-    h_iso_sys = fin2.Get("bkg_isolation_syst_gg")
+    #file_iso = "isolation_sys/hist.root"
+    #fin2 = ROOT.TFile.Open(file_iso, "read")
+    #h_iso_sys = fin2.Get("bkg_isolation_syst_gg")
     ## inflat irreducible uncertainty by factor of 10
     # so that it closes to stats uncertainty in data
     sf = 1
-    if inflate_sys:
+    if INFLATE_SYS:
         sf = 10
 
-    h_purity_sys.Rebin(5).Scale(sf/5)
-    h_irreducible_sys.Rebin(5).Scale(sf/5)
-    h_reducible_sys.Rebin(5).Scale(sf/5)
-    h_iso_sys.Scale(sf)
+    # after rebinning systematic uncertainties, need to scale down,
+    # otherwise the uncertainties are inflated.
+    h_purity_sys.Rebin(num_rebin).Scale(sf/num_rebin)
+    h_irreducible_sys.Rebin(num_rebin).Scale(sf/num_rebin)
+    h_reducible_sys.Rebin(num_rebin).Scale(sf/num_rebin)
+    h_iso_sys.Rebin(num_rebin).Scale(sf/num_rebin)
 
     ## truncate the histograms to [200, 2000] GeV
     h_nom_new = truncate_hist(h_nom, "bkg_nominal")
     h_purity_sys_new = truncate_hist(h_purity_sys, "h_purity_sys_new")
     h_irreducible_sys_new = truncate_hist(h_irreducible_sys, "h_irreducible_sys_new")
     h_reducible_sys_new = truncate_hist(h_reducible_sys, "h_reducible_sys_new")
-    
+    h_iso_sys_new = truncate_hist(h_iso_sys, "h_iso_sys_new")
+
     #write down sys and nominal
     fout.cd()
     h_nom_new.Write()
     h_purity_sys_new.Write()
     h_reducible_sys_new.Write()
     h_irreducible_sys_new.Write()
+    h_iso_sys_new.Write()
 
     h_purity_up, h_purity_down = create_sys_hist(h_nom_new, h_purity_sys_new, "purity_sys")
     h_purity_up.Write()
@@ -121,9 +132,10 @@ def produce_13TeV_template( tag_name = "HKHI" ):
 
     fin.Close()
     fout.Close()
-    
+
 
 if __name__ == "__main__":
     #produce_13TeV_template("EKEI")
     #produce_13TeV_template()
-    produce_13TeV_template("EKHI")
+    #produce_13TeV_template("EKHI")
+    produce_13TeV_template("HKHI")

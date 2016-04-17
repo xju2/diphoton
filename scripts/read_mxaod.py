@@ -75,26 +75,27 @@ def read_MxAOD(input_args):
     f_out = ROOT.TFile.Open(out_name, 'recreate')
     ## 2D histogram storing:
     ## BB BE EB EE x EKEI EKHI HKEI HKHI
+    num_y_bins = 50
     h_myy_2D = ROOT.TH2F("h_myy_2D", "inv mass", 36, 200, 2000,
-                         17, -0.5, 16.5)
+                         num_y_bins, -0.5, 0.5+num_y_bins)
     h_myy_all = ROOT.TH1F("h_myy_all", "inv mass", 36, 200, 2000)
 
     # isolation is defined as: etcone40 - 0.022*ET
     h_leading_etcone40_2D = ROOT.TH2F("h_leading_etcone40_2D",
                                       "etcone40 leading photon",
-                                      100, 10, 30,
-                                      17, -0.5, 16.5)
+                                      100, -10, 60,
+                                      num_y_bins+1, -0.5, 0.5+num_y_bins)
     h_subleading_etcone40_2D = ROOT.TH2F("h_subleading_etcone40_2D",
                                          "etcone40 subleading photon",
-                                         100, 10, 30,
-                                         17, -0.5, 16.5)
+                                         100, -10, 60,
+                                         num_y_bins+1, -0.5, .5+num_y_bins)
     # record how long it takes to loop
     start_time = time.time()
     for ientry in xrange(istart, iend):
         if ientry < 0 or ientry > nentries:
             break
         tree.GetEntry(ientry)
-        if ientry % 1E5 == 0:
+        if ientry % 5E5 == 0:
             print "processed, ", ientry - istart, \
                     "with time: ", (time.time()-start_time)/60.
 
@@ -134,8 +135,8 @@ def read_MxAOD(input_args):
         if y_index < 0:
             continue
 
-        leading_iso = br_etcone40[0]/1E3 - br_pt[0]*0.022
-        subleading_iso = br_etcone40[1]/1E3 - br_pt[1]*0.022
+        leading_iso = br_etcone40[0]/1E3 - br_pt[0]*0.022/1E3
+        subleading_iso = br_etcone40[1]/1E3 - br_pt[1]*0.022/1E3
         if br_passTight and br_passEK and br_passEI:
             h_myy_2D.Fill(br_myy/1E3, y_index, weights)
             h_myy_all.Fill(br_myy/1E3, weights)
@@ -156,6 +157,16 @@ def read_MxAOD(input_args):
             h_myy_2D.Fill(br_myy/1E3, y_index+4*3, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4*3, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*3, weights)
+
+        if br_passTight and br_passEK:
+            h_myy_2D.Fill(br_myy/1E3, y_index+4*4, weights)
+            h_leading_etcone40_2D.Fill(leading_iso, y_index+4*4, weights)
+            h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*4, weights)
+
+        if br_passTight and br_passHK:
+            h_myy_2D.Fill(br_myy/1E3, y_index+4*5, weights)
+            h_leading_etcone40_2D.Fill(leading_iso, y_index+4*5, weights)
+            h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*5, weights)
 
     end_time = time.time()
     print "processed time: ", (end_time-start_time)/3600, "H"
@@ -195,5 +206,3 @@ if __name__ == "__main__":
         sys.exit(1)
 
     process(sys.argv[1], -1)
-    #process(TEST_NAME, -1)
-    #read_MxAOD((TEST_NAME, "test.root", 0, 20))

@@ -2,8 +2,11 @@
 
 import ROOT
 
-def main( input_file = "./data/new_sys.root", analysis_tag = "Nominal_8TeV", 
-         with_geo = True):
+def main(input_file="./data/new_sys.root", analysis_tag="Nominal_8TeV",
+         with_geo=True):
+    """
+    Check the inputs!
+    """
     meas_name = "meas_"+analysis_tag
     meas = ROOT.RooStats.HistFactory.Measurement(meas_name, meas_name)
     meas.SetOutputFilePrefix('./results/'+analysis_tag)
@@ -23,20 +26,20 @@ def main( input_file = "./data/new_sys.root", analysis_tag = "Nominal_8TeV",
 
     bkg = ROOT.RooStats.HistFactory.Sample("bkg_nominal", "bkg_nominal", input_file)
     bkg.ActivateStatError()
-    bkg.AddHistoSys("bkg_purity","purity_sys_down", input_file, "",
+    bkg.AddHistoSys("bkg_purity", "purity_sys_down", input_file, "",
                     "purity_sys_up", input_file, "")
-    bkg.AddHistoSys("bkg_irreducible","irreducible_sys_down", input_file, "",
+    bkg.AddHistoSys("bkg_irreducible", "irreducible_sys_down", input_file, "",
                     "irreducible_sys_up", input_file, "")
-    bkg.AddHistoSys("bkg_reducible","reducible_sys_down", input_file, "",
+    bkg.AddHistoSys("bkg_reducible", "reducible_sys_down", input_file, "",
                     "reducible_sys_up", input_file, "")
-    bkg.AddHistoSys("bkg_isolation","isolation_sys_down", input_file, "",
+    bkg.AddHistoSys("bkg_isolation", "isolation_sys_down", input_file, "",
                     "isolation_sys_up", input_file, "")
     if with_geo:
-        bkg.AddHistoSys("geo","geo_sys_down", input_file, "",
-                    "geo_sys_up", input_file, "")
+        bkg.AddHistoSys("geo", "geo_sys_down", input_file, "",
+                        "geo_sys_up", input_file, "")
     chan.AddSample(bkg)
     #end a channel
-    
+
     #finish a channel
     meas.AddChannel(chan)
     meas.CollectHistograms()
@@ -46,9 +49,9 @@ def main( input_file = "./data/new_sys.root", analysis_tag = "Nominal_8TeV",
 if __name__ == "__main__":
     # main()  ## for 8 TeV
 
-    #tag = "HKHI"
-    #main("hists_input_"+tag+".root", tag+"_13TeV", False)
-
-    tag = "EKHI"
+    tag = "HKHI"
     main("hists_input_"+tag+".root", tag+"_13TeV", False)
+
+    #tag = "EKHI"
+    #main("hists_input_"+tag+".root", tag+"_13TeV", False)
 

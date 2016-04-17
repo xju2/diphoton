@@ -9,18 +9,29 @@ ROOT.gROOT.SetBatch()
 if not hasattr(ROOT, "myLegend"):
     ROOT.gROOT.LoadMacro("/afs/cern.ch/user/x/xju/tool/loader.c") 
 
-def plot_sys(file_name = "hists_input_HKHI.root", is_8TeV = False):
+def plot_sys(file_name="hists_input_HKHI.root", is_8TeV=False, new_sample=True):
     f2 = ROOT.TFile.Open(file_name, "read")
 
     h_nom = f2.Get("bkg_nominal")
-    h_purity = f2.Get("bkg_purity_syst_gg")
-    h_red = f2.Get("bkg_reducible_syst_gg")
-    h_irred = f2.Get("bkg_irreducible_syst_gg")
-    h_geo = f2.Get("bkg_geo_syst_gg")
+    #new_sample = True
+    if new_sample:
+        SUFFIX = "_sys_new" # syst_gg
+        prefix = "h_" #bkg_
+        h_iso = f2.Get(prefix+"iso"+SUFFIX)
+    else:
+        SUFFIX = "_syst_gg" # syst_gg
+        prefix = "bkg_" #bkg_
+        f1 = ROOT.TFile.Open("isolation_sys/hist.root", "read")
+        h_iso = f1.Get("bkg_isolation_syst_gg")
+    h_purity = f2.Get(prefix+"purity"+SUFFIX)
+    h_red = f2.Get(prefix+"reducible"+SUFFIX)
+    h_irred = f2.Get(prefix+"irreducible"+SUFFIX)
+    h_geo = f2.Get(prefix+"geo"+SUFFIX)
 
 
     h_stats = h_nom.Clone("h_stats")
     h_total = h_nom.Clone("h_total")
+    print "nbins of nominal shape: ", h_nom.GetNbinsX()
     for ibin in range(h_nom.GetNbinsX()):
         bin_val = h_nom.GetBinContent(ibin+1)
         error = h_nom.GetBinError(ibin+1) / bin_val
@@ -30,16 +41,18 @@ def plot_sys(file_name = "hists_input_HKHI.root", is_8TeV = False):
         purity = h_purity.GetBinContent(ibin+1)
         red = h_red.GetBinContent(ibin+1)
         irred = h_irred.GetBinContent(ibin+1)
+        iso = h_iso.GetBinContent(ibin+1)
         if h_geo: geo = h_geo.GetBinContent(ibin+1)
         else: geo = 0
-        total = math.sqrt(purity**2+red**2+irred**2+geo**2)
+        total = math.sqrt(purity**2+red**2+irred**2+geo**2+iso**2)
         h_total.SetBinContent(ibin+1, total)
         h_total.SetBinError(ibin+1, 0)
 
 
     canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
     max_y = h_total.GetMaximum()
-    h_total.GetYaxis().SetRangeUser(0.0, max_y*1.1)
+    #h_total.GetYaxis().SetRangeUser(-0.010, max_y*1.1)
+    h_total.GetYaxis().SetRangeUser(-0.20, 0.8)
 
     h_total.SetMarkerSize(0.)
     h_purity.SetMarkerSize(0.)
@@ -50,6 +63,7 @@ def plot_sys(file_name = "hists_input_HKHI.root", is_8TeV = False):
     h_purity.SetLineColor(8)
     h_red.SetLineColor(4)
     h_irred.SetLineColor(2)
+    h_iso.SetLineColor(6)
     h_total.SetFillColor(33)
     h_total.SetLineColor(33)
     h_total.GetXaxis().SetTitle("m_{#gamma#gamma} [GeV]")
@@ -59,7 +73,8 @@ def plot_sys(file_name = "hists_input_HKHI.root", is_8TeV = False):
     h_purity.Draw("same HIST")
     h_red.Draw("same HIST")
     h_irred.Draw("same HIST")
-    if h_geo: 
+    h_iso.Draw("same HIST")
+    if h_geo:
         h_geo.SetLineColor(ROOT.kViolet)
         h_geo.Draw("same HIST")
 
@@ -68,7 +83,8 @@ def plot_sys(file_name = "hists_input_HKHI.root", is_8TeV = False):
     leg.AddEntry(h_red, "reducible", "L")
     leg.AddEntry(h_irred, "irreducible", "L")
     leg.AddEntry(h_purity, "purity", "L")
-    if h_geo: 
+    leg.AddEntry(h_iso, "isolation", "L")
+    if h_geo:
         leg.AddEntry(h_geo, "Geo21/Geo20", "L")
     leg.AddEntry(h_stats, "stats", "l")
     leg.Draw()
@@ -193,15 +209,14 @@ def plot_overall(file_name = "hists_input_HKHI.root", is_8TeV = False):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2: 
-        print sys.argv[0]," hist_input is_8TeV"
+    if len(sys.argv) < 3: 
+        print sys.argv[0]," hist_input is_8TeV newsample"
         sys.exit(1)
 
     input_name = sys.argv[1]
-    is_8TeV = False
-    if len(sys.argv) > 2:
-        is_8TeV = bool(sys.argv[2])
-    
-    print input_name, is_8TeV
-    plot_sys(input_name, is_8TeV)
-    plot_overall(input_name, is_8TeV)
+    is_8TeV = bool(int(sys.argv[2]))
+    new_sample = bool(int(sys.argv[3]))
+
+    print input_name, is_8TeV, new_sample
+    plot_sys(input_name, is_8TeV, new_sample)
+    #plot_overall(input_name, is_8TeV)
