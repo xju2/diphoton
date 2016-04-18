@@ -12,23 +12,27 @@ class HistHandler:
     def __init__(self):
         print "HistHandler create"
         self.OBS_NAME = "obs"
-        self.ws = ROOT.RooWorkspace("combined", "combined")
+        self.WEIGHT_NAME = "weight"
         self.analysis = "EK"
         self.OUTPUT_NAME = "ws_"+self.analysis+".root"
-        self.out_file = ROOT.TFile.Open(self.OUTPUT_NAME, "recreate")
+        self.COMBINE_PDF_NAME = "combPdf"
 
     def make_dataset(self, hist):
         if not hist:
             return None
         nbins = hist.GetNbinsX()
         obs = self.ws.var(self.OBS_NAME)
+        weight = self.ws.var(self.WEIGHT_NAME)
         dataset = ROOT.RooDataSet("dataset_"+hist.GetName(), "data",
-                                  RooArgSet(obs), "weight")
+                                  RooArgSet(obs, weight), 
+                                  RooFit.WeightVar(weight)
+                                 )
         for ibin in range(1, nbins+1):
             x_val = hist.GetBinCenter(ibin)
             y_val = hist.GetBinContent(ibin)
+            weight.setVal(y_val)
             obs.setVal(x_val)
-            dataset.add(RooArgSet(obs), y_val)
+            dataset.add(RooArgSet(obs,weight), y_val)
         return dataset
 
     def get_datahist():
@@ -74,15 +78,16 @@ class HistHandler:
         using input histograms, build the combined workspace, 
         which contains models and data
         """
+        self.ws = ROOT.RooWorkspace("combined", "combined")
         leading_gamma_pdf = self.make_histpdf(leading_gamma)
         leading_jet_pdf = self.make_histpdf(leading_jet)
         subleading_gamma_pdf = self.make_histpdf(subleading_gamma)
         subleading_jet_pdf = self.make_histpdf(subleading_jet)
 
-        gg_events = ROOT.RooRealVar("gg_events", "gg", 0, 1E4)
-        gj_events = ROOT.RooRealVar("gj_events", "gj", 0, 1E4)
-        jg_events = ROOT.RooRealVar("jg_events", "jg", 0, 1E4)
-        jj_events = ROOT.RooRealVar("jj_events", "jj", 0, 1E4)
+        gg_events = ROOT.RooRealVar("gg_events", "gg", 0, 1E7)
+        gj_events = ROOT.RooRealVar("gj_events", "gj", 0, 1E7)
+        jg_events = ROOT.RooRealVar("jg_events", "jg", 0, 1E7)
+        jj_events = ROOT.RooRealVar("jj_events", "jj", 0, 1E7)
         LEADING_PDF_NAME = "combined_leading"
         combined_leading_pdf = ROOT.RooAddPdf(LEADING_PDF_NAME,
                                               LEADING_PDF_NAME,
@@ -110,22 +115,28 @@ class HistHandler:
         categories = ROOT.RooCategory("channelCat", "channelCat")
         categories.defineType("leading", 0)
         categories.defineType("subleading", 1)
-        COMBINE_PDF_NAME = "combined"
-        combined_pdf = ROOT.RooSimultaneous(COMBINE_PDF_NAME, COMBINE_PDF_NAME, categories)
+        combined_pdf = ROOT.RooSimultaneous(self.COMBINE_PDF_NAME,
+                                            self.COMBINE_PDF_NAME, categories)
         combined_pdf.addPdf(combined_leading_pdf, "leading")
         combined_pdf.addPdf(combined_subleading_pdf, "subleading")
         getattr(self.ws, 'import')(combined_pdf, RooFit.RecycleConflictNodes())
 
         # build RooDataSet
         obs = self.ws.var(self.OBS_NAME)
+        weight = self.ws.var(self.WEIGHT_NAME)
+        if not weight:
+            weight = ROOT.RooRealVar(self.WEIGHT_NAME, self.WEIGHT_NAME, 0, 1E6)
+            getattr(self.ws,'import')(weight)
         dataset_leading = self.make_dataset(data_leading)
         dataset_subleading = self.make_dataset(data_subleading)
-        dataset = ROOT.RooDataSet("data", "data",
-                                  RooArgSet(obs),
-                                  RooFit.Index(categories),
-                                  RooFit.Import("leading", dataset_leading),
-                                  RooFit.Import("subleading", dataset_subleading)
-                                 )
+        dataset = ROOT.RooDataSet(
+            "obsData", "data",
+            RooArgSet(obs, weight),
+            RooFit.Index(categories),
+            RooFit.Import("leading", dataset_leading),
+            RooFit.Import("subleading", dataset_subleading),
+            RooFit.WeightVar(weight)
+        )
         getattr(self.ws, 'import')(dataset, RooFit.RecycleConflictNodes())
 
         self.ws.writeToFile(self.OUTPUT_NAME)
@@ -188,42 +199,27 @@ class HistHandler:
         """
             main function to process the three files
         """
-        gg_leading, gg_subleading = self.get_hists(fgg_name)
+        gg_leading, gg_subleading = self.get_hists(fgg_name, True)
         jj_leading, jj_subleading = self.get_hists(fjj_name)
         data_leading, data_subleading = self.get_hists(fdata_name)
 
+        # compare pythia, Sherpa, bkg and data
         pythia_file_name = "gg_template_pythia.root"
-        sherpa_file_name = "gg_template_sharpa.root"
         gg_pythia_leading, gg_pythia_subleading = self.get_hists(pythia_file_name, True)
-        gg_sherpa_leading, gg_sherpa_subleading = self.get_hists(sherpa_file_name, True)
         generator_leading = {
             "data": data_leading,
             "pythia":gg_pythia_leading,
-            "sherpa":gg_sherpa_leading,
+            "sherpa":gg_leading,
             "bkg template": jj_leading,
         }
         generator_subleading = {
             "data": data_subleading,
             "pythia":gg_pythia_subleading,
-            "sherpa":gg_sherpa_subleading,
+            "sherpa":gg_subleading,
             "bkg template": jj_subleading,
         }
         self.compare_hists(generator_leading, "leading_gg")
         self.compare_hists(generator_subleading, "subleading_gg")
-
-        # check the distributions
-        component_leading = {
-            "data": data_leading,
-            "#gamma": gg_leading,
-            "jet": jj_leading
-        }
-        component_subleading = {
-            "data": data_leading,
-            "#gamma": gg_leading,
-            "jet": jj_leading
-        }
-        self.compare_hists(component_leading, "leading")
-        self.compare_hists(component_subleading, "subleading")
 
         self.get_combined_ws(gg_leading, gg_subleading,
                              jj_leading, jj_subleading,
@@ -237,11 +233,12 @@ class HistHandler:
         canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
         # rebin histograms for comparison only!
         # scale all histograms to unit
-        num_rebin = 2
+        num_rebin = 1
         for name, hist in hist_dict.iteritems():
             if hist is None: continue
             hist.Rebin(num_rebin)
-            hist.Scale(1./hist.Integral())
+            if name == "sherpa":
+                hist.Scale(3.2)
 
         max_y = max([x.GetMaximum() for x in hist_dict.itervalues()])
 
@@ -267,10 +264,81 @@ class HistHandler:
         ROOT.myText(0.6, 0.85, 1, self.analysis)
         canvas.SaveAs(self.analysis+"_"+out_name+".pdf")
 
+    def fit_workspace(self): 
+        """
+        Take the data and pdf from the workspace and 
+        perform the fitting
+        """
+        if not self.ws:
+            f_in = ROOT.TFile.Open(self.OUTPUT_NAME)
+            ws = f_in.Get("combined")
+        else:
+            ws = self.ws
+        pdf = ws.obj(self.COMBINE_PDF_NAME)
+        data = ws.data("obsData")
+        pdf.fitTo(
+            data, RooFit.Extended(True),
+            RooFit.Minimizer("Minuit2", ROOT.Math.MinimizerOptions.DefaultMinimizerAlgo())
+        )
+        obs = ws.var("obs")
+        self.plot_pdf_data(pdf, obs)
+        f_in.Close()
+
+    @staticmethod
+    def plot_pdf_data(pdf, obs):
+        """
+        plot individual components
+        """
+        category = pdf.indexCat()
+        cat_iter = ROOT.TIter(category.typeIterator())
+        obj = cat_iter()
+        data_list = data.split(category, True)
+        while obj:
+            color = 2
+            ch_name = obj.GetName()
+            ch_pdf = pdf.getPdf(ch_name)
+            ch_pdf.Print()
+            frame = obs.frame()
+            ch_data = data_list.At(obj.getVal())
+            # print expected and observed events
+            exp_events = ch_pdf.expectedEvents(RooArgSet(obs))
+            obs_events = ch_data.sumEntries()
+            print "In ", ch_name, exp_events, obs_events
+            # plot pdf and data
+            ch_pdf.plotOn(
+                frame,
+                RooFit.LineWidth(2),
+                RooFit.LineColor(color),
+                RooFit.Normalization(exp_events, ROOT.RooAbsReal.NumEvent),
+            )
+            color += 1
+            # plot individual components in pdf
+            ch_pdf_pdf_list = ch_pdf.pdfList()
+            ch_pdf_coeff_list = ch_pdf.coefList()
+            for ilist in range(ch_pdf_pdf_list.getSize()):
+                pdf_ = ch_pdf_pdf_list.at(ilist)
+                norm_ = ch_pdf_coeff_list.at(ilist)
+                pdf_.plotOn(
+                    frame, RooFit.LineWidth(2),
+                    RooFit.LineColor(color),
+                    RooFit.LineStyle(2),
+                    RooFit.Normalization(norm_.getVal(), ROOT.RooAbsReal.NumEvent),
+                )
+                color += 1
+            ch_data.plotOn(frame, RooFit.LineWidth(2),
+                           RooFit.LineColor(1),
+                           RooFit.DrawOption("ep")
+                          )
+            canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
+            frame.Draw()
+            canvas.SaveAs(ch_name+"_overlay.pdf")
+            obj = cat_iter()
+            color += 1
 
 if __name__ == "__main__":
-    handle = HistHandler()
-    GG_FILENAME = "gg_template.root"
+    GG_FILENAME = "gg_template_sherpa.root"
     JJ_FIELNAME = "jj_template.root"
     DATA_FILENAME = "data_template.root"
+    handle = HistHandler()
     handle.process(GG_FILENAME, JJ_FIELNAME, DATA_FILENAME)
+    handle.fit_workspace()
