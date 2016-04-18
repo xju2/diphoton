@@ -199,8 +199,8 @@ class HistHandler:
         """
             main function to process the three files
         """
-        gg_leading, gg_subleading = self.get_hists(fgg_name, True)
-        jj_leading, jj_subleading = self.get_hists(fjj_name)
+        self.gg_leading, self.gg_subleading = self.get_hists(fgg_name, True)
+        self.jj_leading, self.jj_subleading = self.get_hists(fjj_name)
         data_leading, data_subleading = self.get_hists(fdata_name)
 
         # compare pythia, Sherpa, bkg and data
@@ -209,21 +209,25 @@ class HistHandler:
         generator_leading = {
             "data": data_leading,
             "pythia":gg_pythia_leading,
-            "sherpa":gg_leading,
-            "bkg template": jj_leading,
+            "sherpa":self.gg_leading,
+            "bkg template":self.jj_leading,
         }
         generator_subleading = {
             "data": data_subleading,
             "pythia":gg_pythia_subleading,
-            "sherpa":gg_subleading,
-            "bkg template": jj_subleading,
+            "sherpa":self.gg_subleading,
+            "bkg template":self.jj_subleading,
         }
         self.compare_hists(generator_leading, "leading_gg")
         self.compare_hists(generator_subleading, "subleading_gg")
 
-        self.get_combined_ws(gg_leading, gg_subleading,
-                             jj_leading, jj_subleading,
+        self.get_combined_ws(self.gg_leading, self.gg_subleading,
+                             self.jj_leading, self.jj_subleading,
                              data_leading, data_subleading)
+
+        self.fit_workspace()
+
+        self.get_results()
 
     def compare_hists(self, hist_dict, out_name):
         """
@@ -281,11 +285,10 @@ class HistHandler:
             RooFit.Minimizer("Minuit2", ROOT.Math.MinimizerOptions.DefaultMinimizerAlgo())
         )
         obs = ws.var("obs")
-        self.plot_pdf_data(pdf, obs)
-        f_in.Close()
+        self.plot_pdf_data(pdf, obs, data)
 
     @staticmethod
-    def plot_pdf_data(pdf, obs):
+    def plot_pdf_data(pdf, obs, data):
         """
         plot individual components
         """
@@ -334,6 +337,9 @@ class HistHandler:
             canvas.SaveAs(ch_name+"_overlay.pdf")
             obj = cat_iter()
             color += 1
+
+    def get_results(self, cut_value):
+       pass 
 
 if __name__ == "__main__":
     GG_FILENAME = "gg_template_sherpa.root"
