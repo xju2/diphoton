@@ -3,10 +3,24 @@
 import ROOT
 import AtlasStyle
 import new_sys
+import sys
 
 ROOT.gROOT.SetBatch()
 if not hasattr(ROOT, "myLegend"):
     ROOT.gROOT.LoadMacro("/afs/cern.ch/user/x/xju/tool/loader.c") 
+
+def extend_hist(h1, h2):
+    """
+    extend h1 to the range of h2, they has to have the same binning
+    """
+    h1_clone = h2.Clone(h1.GetName()+"_new")
+    for ibin in range(1, h2.GetNbinsX()+1):
+        if ibin <= h1.GetNbinsX():
+            y_val = h1.GetBinContent(ibin)
+        else:
+            y_val = 0.0
+        h1_clone.SetBinContent(ibin, y_val)
+    return h1_clone 
 
 def compare(f1_name, f2_name, f3_name):
     f1 = ROOT.TFile.Open(f1_name, "read")
@@ -25,7 +39,7 @@ def compare(f1_name, f2_name, f3_name):
     bkg_f1.SetMarkerSize(0)
     bkg_f2.SetMarkerSize(0)
     bkg_f3.SetMarkerSize(0)
-    
+
     h_bkgs = ROOT.TList()
     h_bkgs.Add(bkg_f1)
     h_bkgs.Add(bkg_f2)
@@ -47,13 +61,13 @@ def compare_ws_hist(f1_name, f2_name):
     if not f1 or not f2: return None
 
     bkg_f2 = f2.Get("bkg_total_gg_full")
-    bkg_f2.Rebin(5)
+    #bkg_f2.Rebin(5)
 
     ws = f1.Get("combined")
     pdf = ws.obj("channel_model")
     obs = ws.var("obs_x_channel")
-    obs.setRange(200, 3500)
-    nbins = 660
+    obs.setRange(200, 5000)
+    nbins = 960
     bkg_f1 = pdf.createHistogram("bkg_f1", obs, ROOT.RooFit.Binning(nbins))
     print bkg_f1.Integral(), bkg_f2.Integral()
     bkg_f1.Scale(bkg_f2.Integral()/bkg_f1.Integral())
@@ -145,6 +159,38 @@ def compare_ws_ws(f1_name, f2_name):
     legend.Draw()
     canvas.SaveAs(f1_name.replace("root", "pdf"))
 
+def compare_hist_hist(f1_name, f2_name, hist_name):
+    f1 = ROOT.TFile.Open(f1_name, "read") # New
+    f2 = ROOT.TFile.Open(f2_name, "read") # Old
+    h1 = f1.Get(hist_name)
+    if "olation" in f2_name:
+        h2 = f2.Get("up")
+    else:
+        h2 = f2.Get(hist_name)
+    print "binning: ", h1.GetNbinsX(), h2.GetNbinsX()
+    #h2.Rebin(5)
+    h2_new = extend_hist(h2, h1)
+    h1.SetMarkerSize(0)
+    h2_new.SetMarkerSize(0)
+    ROOT.compare_two_hists(h1, h2_new, "m_{#gamma#gamma} [GeV]",
+                           "New", "Old", True)
+    f1.Close()
+    f2.Close()
+
+def compare_hists(f1_name, f2_name, hist_name):
+    f1 = ROOT.TFile.Open(f1_name, "read") # Data
+    f2 = ROOT.TFile.Open(f2_name, "read") # MC 
+    h1 = f1.Get(hist_name)
+    h2 = f2.Get(hist_name)
+    print "binning: ", h1.GetNbinsX(), h2.GetNbinsX()
+    h2.Scale(h1.Integral()/h2.Integral())
+    h1.SetMarkerSize(0)
+    h2.SetMarkerSize(0)
+    ROOT.compare_two_hists(h1, h2, "Isolation [GeV]",
+                           "Data", "MC", False)
+    f1.Close()
+    f2.Close()
+
 def test1():
     f1 = "out_hist_v4.root"
     #f2 = "out_hist_v5.root"
@@ -165,6 +211,22 @@ if __name__ == "__main__":
     #test1()
     #compare_ws_ws("bkg_histFitter_ws_8tev.root",
     #              "results/test_8TeV_combined_meas_model.root")
-    compare_ws_ws("ruggero_template/bkg_histFitter_ws_13TeV_HKHI.root",
-                  "../bkg_histofactory_13TeV/results/HKHI_13TeV_combined_meas_model_nominal.root")
+    #compare_ws_ws("ruggero_template/bkg_histFitter_ws_13TeV_HKHI.root",
+    #              "../bkg_histofactory_13TeV/results/HKHI_13TeV_combined_meas_model_nominal.root")
+    #compare_ws_hist("bkg_histFitter_ws_13TeV_HKHI_5TeV_v1.root",
+    #                "BkgEstimation_NONE_NONE_TOPO_PTDEP_HKHI_Lin_5000GeV_v2.root")
 
+    #compare_hist_hist(
+    #    "BkgEstimation_NONE_NONE_TOPO_PTDEP_EKHI_Lin_5000GeV.root",
+    #    "/Users/xju/work/diphoton/check_ws/BkgEstimation_Lin/BkgEstimation_NONE_TOPO_PTDEP_EKHI_Lin.root",
+    #    "bkg_total_gg_full"
+    #)
+    #compare_hist_hist(
+    #    "IsolationVariation_extend.root",
+    #    "/Users/xju/work/diphoton/bkg_histofactory_13TeV/inputs/BkgEstimation_Lin/isolation_shapevariation.root",
+    #    "h_isoshape"
+    #)
+    if len(sys.argv) < 3:
+        print sys.argv[0]," f1_name f2_name hist_name"
+        sys.exit(1)
+    compare_hist_hist(sys.argv[1], sys.argv[2], sys.argv[3])

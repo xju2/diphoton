@@ -6,7 +6,7 @@ from multiprocessing import Pool
 import time
 import ROOT
 import sys
-ROOT.gROOT.SetBatch()
+ROOT.gROOT.SetBatch(True)
 
 __version__ = "$Revision$"
 
@@ -58,7 +58,7 @@ def read_MxAOD(input_args):
         return
     file_name, out_name, istart, iend = input_args
     print "file_name: ", file_name
-    print "out_name: ",out_name
+    print "out_name: ", out_name
     print "start: ", istart
     print "end: ", iend
 
@@ -66,8 +66,20 @@ def read_MxAOD(input_args):
     #ROOT.gROOT.Macro("$ROOTCOREDIR/scripts/load_packages.C")
     #if not ROOT.xAOD.Init().isSuccess() :
     #    print "Failed xAOD.Init()"
+    fin = ROOT.TFile.Open(file_name)
+    hist_name = "CutFlow_"+file_name.split('/')[-1].split('.')[0]
+    hist_event_info = fin.Get(hist_name)
+    total_event = -1
+    is_data = "data" in file_name
+    if hist_event_info:
+        total_event = hist_event_info.GetBinContent(1)
+    else:
+        print "cannot find total events: ", hist_name
+        if not is_data:
+            sys.exit(1)
 
     tree = ROOT.loader(file_name, TREE_NAME)
+    LUMI = 1000.
 
     nentries = tree.GetEntries()
     print "Number of input events: %s" % nentries
@@ -99,20 +111,29 @@ def read_MxAOD(input_args):
             print "processed, ", ientry - istart, \
                     "with time: ", (time.time()-start_time)/60.
 
-        weights = getattr(tree, "HGamEventInfoAuxDyn.weight")
         br_passPreSelection = getattr(tree, "HGamEventInfoAuxDyn.isPassedPreselection")
-        if not br_passPreSelection:
+        br_myy = getattr(tree, "HGamEventInfoAuxDyn.m_yy")
+        br_passTight = getattr(tree, "HGamEventInfoAuxDyn.isPassedPID")
+        if not br_passPreSelection or br_myy < 150E3 or not br_passTight:
             continue   ## at least two loose photons
 
-        br_passTight = getattr(tree, "HGamEventInfoAuxDyn.isPassedPID")
         br_passEK = getattr(tree, "HGamEventInfoAuxDyn.isPassedlPtCutsExotic")
         br_passEI = getattr(tree, "HGamEventInfoAuxDyn.isPassedIsolationExotic")
         br_passHK = getattr(tree, "HGamEventInfoAuxDyn.isPassedRelPtCuts")
         br_passHI = getattr(tree, "HGamEventInfoAuxDyn.isPassedIsolation")
-        br_myy = getattr(tree, "HGamEventInfoAuxDyn.m_yy")
+
+        #weights = getattr(tree, "HGamEventInfoAuxDyn.weight") ## vertext * pileup
+        vertexWeight = getattr(tree, "HGamEventInfoAuxDyn.vertexWeight")
+        conversionType = getattr(tree, "HGamPhotonsAuxDyn.conversionType")
+        # not applying pileup weights!
+        if not is_data:
+            crossSectionBRfilterEff = getattr(tree, "HGamEventInfoAuxDyn.crossSectionBRfilterEff")
+            weights = crossSectionBRfilterEff*vertexWeight*LUMI/total_event
+        else:
+            weights = 1.0
 
 
-        ## photon selections
+        # photon selections
         br_isTight = getattr(tree, "HGamPhotonsAuxDyn.isTight")
         br_pt = getattr(tree, "HGamPhotonsAuxDyn.pt")
         br_etcone40 = getattr(tree, "HGamPhotonsAuxDyn.topoetcone40")
@@ -137,33 +158,33 @@ def read_MxAOD(input_args):
 
         leading_iso = br_etcone40[0]/1E3 - br_pt[0]*0.022/1E3
         subleading_iso = br_etcone40[1]/1E3 - br_pt[1]*0.022/1E3
-        if br_passTight and br_passEK and br_passEI:
+        if  br_passEK and br_passEI:
             h_myy_2D.Fill(br_myy/1E3, y_index, weights)
             h_myy_all.Fill(br_myy/1E3, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index, weights)
 
-        if br_passTight and br_passEK and br_passHI:
+        if  br_passEK and br_passHI:
             h_myy_2D.Fill(br_myy/1E3, y_index+4, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4, weights)
 
-        if br_passTight and br_passHK and br_passEI:
+        if  br_passHK and br_passEI:
             h_myy_2D.Fill(br_myy/1E3, y_index+4*2, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4*2, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*2, weights)
 
-        if br_passTight and br_passHK and br_passHI:
+        if  br_passHK and br_passHI:
             h_myy_2D.Fill(br_myy/1E3, y_index+4*3, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4*3, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*3, weights)
 
-        if br_passTight and br_passEK:
+        if  br_passEK:
             h_myy_2D.Fill(br_myy/1E3, y_index+4*4, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4*4, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*4, weights)
 
-        if br_passTight and br_passHK:
+        if  br_passHK:
             h_myy_2D.Fill(br_myy/1E3, y_index+4*5, weights)
             h_leading_etcone40_2D.Fill(leading_iso, y_index+4*5, weights)
             h_subleading_etcone40_2D.Fill(subleading_iso, y_index+4*5, weights)
