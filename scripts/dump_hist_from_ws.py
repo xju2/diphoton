@@ -67,4 +67,3 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print sys.argv[0]," ws_name out_name"
     get_hist(sys.argv[1], sys.argv[2])
-

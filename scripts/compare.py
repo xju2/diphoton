@@ -181,13 +181,32 @@ def compare_hists(f1_name, f2_name, hist_name):
     f1 = ROOT.TFile.Open(f1_name, "read") # Data
     f2 = ROOT.TFile.Open(f2_name, "read") # MC 
     h1 = f1.Get(hist_name)
-    h2 = f2.Get(hist_name)
+    #if "v7" in f1_name:
+        #h2.Rebin(5)
+    if "solation" in f2_name:
+        if "_extend" in f2_name:
+            h2 = f2.Get("h_isoshape")
+        else:
+            h2 = f2.Get("up")
+    else:
+        h2 = f2.Get(hist_name)
     print "binning: ", h1.GetNbinsX(), h2.GetNbinsX()
-    h2.Scale(h1.Integral()/h2.Integral())
+    sys_name = hist_name.split('_')[1]
+    factor = 1.0
+    is_log = False
+    if "bkg_total_gg_full" in hist_name:
+        is_log = True
+        factor = h1.Integral()/h2.Integral()
+    print "intergral: ", h1.Integral(), h2.Integral(), factor
+    h2.Scale(factor)
     h1.SetMarkerSize(0)
     h2.SetMarkerSize(0)
-    ROOT.compare_two_hists(h1, h2, "Isolation [GeV]",
-                           "Data", "MC", False)
+    ROOT.compare_two_hists(h1, h2,
+                           #"Isolation [GeV]",
+                           "m_{#gamma#gamma} [GeV]",
+                           sys_name+" from ws", 
+                           sys_name+" from original input",
+                           is_log)
     f1.Close()
     f2.Close()
 
@@ -229,4 +248,4 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print sys.argv[0]," f1_name f2_name hist_name"
         sys.exit(1)
-    compare_hist_hist(sys.argv[1], sys.argv[2], sys.argv[3])
+    compare_hists(sys.argv[1], sys.argv[2], sys.argv[3])
