@@ -16,6 +16,8 @@ class HistHandler:
         self.analysis = "EK"
         self.OUTPUT_NAME = "ws_"+self.analysis+".root"
         self.COMBINE_PDF_NAME = "combPdf"
+        self.ISO_CUT = 2.45
+        self.X_TITLE = "E_{T}^{iso} - 0.022 #times E_{T} [GeV]"
 
     def make_dataset(self, hist):
         if not hist:
@@ -24,15 +26,17 @@ class HistHandler:
         obs = self.ws.var(self.OBS_NAME)
         weight = self.ws.var(self.WEIGHT_NAME)
         dataset = ROOT.RooDataSet("dataset_"+hist.GetName(), "data",
-                                  RooArgSet(obs, weight), 
+                                  RooArgSet(obs, weight),
                                   RooFit.WeightVar(weight)
                                  )
+        print "number of entries: ", hist.GetEntries(), hist.Integral()
         for ibin in range(1, nbins+1):
             x_val = hist.GetBinCenter(ibin)
             y_val = hist.GetBinContent(ibin)
             weight.setVal(y_val)
             obs.setVal(x_val)
             dataset.add(RooArgSet(obs,weight), y_val)
+        print "dataSet: ", dataset.sumEntries()
         return dataset
 
     def get_datahist():
@@ -193,13 +197,15 @@ class HistHandler:
         h1d_leading.SetDirectory(0)
         h1d_subleading.SetDirectory(0)
         fin.Close()
+        h1d_leading.SetName("leading_"+file_name.replace(".root",""))
+        h1d_subleading.SetName("subleading_"+file_name.replace(".root",""))
         return (h1d_leading, h1d_subleading)
 
     def process(self, fgg_name, fjj_name, fdata_name):
         """
             main function to process the three files
         """
-        self.gg_leading, self.gg_subleading = self.get_hists(fgg_name, True)
+        self.gg_leading, self.gg_subleading = self.get_hists(fgg_name)
         self.jj_leading, self.jj_subleading = self.get_hists(fjj_name)
         data_leading, data_subleading = self.get_hists(fdata_name)
 
@@ -229,20 +235,23 @@ class HistHandler:
 
         self.get_results()
 
-    def compare_hists(self, hist_dict, out_name):
+    def compare_hists(self, hist_dict_org, out_name):
         """
         compare the two templates with the data
         They are scaled to unit
         """
         canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
+        # make a copy of input histograms
+        hist_dict = {}
+        for name, hist in hist_dict_org.iteritems():
+            hist_dict[name] = hist.Clone(hist.GetName()+"_cp")
         # rebin histograms for comparison only!
         # scale all histograms to unit
-        num_rebin = 1
+        num_rebin = 2
         for name, hist in hist_dict.iteritems():
             if hist is None: continue
             hist.Rebin(num_rebin)
-            if name == "sherpa":
-                hist.Scale(3.2)
+            hist.Scale(1./hist.Integral())
 
         max_y = max([x.GetMaximum() for x in hist_dict.itervalues()])
 
@@ -250,7 +259,6 @@ class HistHandler:
         num_count = 0
         color_list = [2, 4, ROOT.kGreen+1, ROOT.kOrange+6, ROOT.kViolet-3]
         legend = ROOT.myLegend(0.6, 0.6, 0.8, 0.8)
-        X_TITLE = "E_{T}^{iso} - 0.022 #times E_{T} [GeV]"
         for name, hist in hist_dict.iteritems():
             if hist is None: continue
             hist.SetLineColor(color_list[num_count])
@@ -258,7 +266,7 @@ class HistHandler:
             hist.SetMarkerSize(0)
             if num_count == 0:
                 hist.GetYaxis().SetRangeUser(0., max_y*1.1)
-                hist.GetXaxis().SetTitle(X_TITLE)
+                hist.GetXaxis().SetTitle(self.X_TITLE)
                 hist.Draw("HIST")
             else:
                 hist.Draw("same HIST")
@@ -285,10 +293,10 @@ class HistHandler:
             RooFit.Minimizer("Minuit2", ROOT.Math.MinimizerOptions.DefaultMinimizerAlgo())
         )
         obs = ws.var("obs")
-        self.plot_pdf_data(pdf, obs, data)
+        self.plot_pdf_data(pdf, obs, data, self.X_TITLE)
 
     @staticmethod
-    def plot_pdf_data(pdf, obs, data):
+    def plot_pdf_data(pdf, obs, data, xtitle):
         """
         plot individual components
         """
@@ -297,6 +305,7 @@ class HistHandler:
         obj = cat_iter()
         data_list = data.split(category, True)
         while obj:
+            legend = ROOT.myLegend(0.6, 0.6, 0.8, 0.9)
             color = 2
             ch_name = obj.GetName()
             ch_pdf = pdf.getPdf(ch_name)
@@ -307,17 +316,27 @@ class HistHandler:
             exp_events = ch_pdf.expectedEvents(RooArgSet(obs))
             obs_events = ch_data.sumEntries()
             print "In ", ch_name, exp_events, obs_events
-            # plot pdf and data
+            # plot data
+            index_obj = 0
+            ch_data.plotOn(frame, RooFit.LineWidth(2),
+                           RooFit.LineColor(1),
+                           RooFit.DrawOption("ep")
+                          )
+            legend.AddEntry(frame.getObject(index_obj), "data", "EP")
+            index_obj += 1
+            # plot pdf
             ch_pdf.plotOn(
                 frame,
                 RooFit.LineWidth(2),
                 RooFit.LineColor(color),
                 RooFit.Normalization(exp_events, ROOT.RooAbsReal.NumEvent),
             )
+            legend.AddEntry(frame.getObject(index_obj), "total", "L")
             color += 1
             # plot individual components in pdf
             ch_pdf_pdf_list = ch_pdf.pdfList()
             ch_pdf_coeff_list = ch_pdf.coefList()
+            index_obj += 1
             for ilist in range(ch_pdf_pdf_list.getSize()):
                 pdf_ = ch_pdf_pdf_list.at(ilist)
                 norm_ = ch_pdf_coeff_list.at(ilist)
@@ -327,24 +346,57 @@ class HistHandler:
                     RooFit.LineStyle(2),
                     RooFit.Normalization(norm_.getVal(), ROOT.RooAbsReal.NumEvent),
                 )
+                #print "\t ", norm_.GetName(), norm_.getVal()
+                legend.AddEntry(frame.getObject(index_obj),
+                                norm_.GetName().replace("_events",""),
+                                "L")
+                index_obj += 1
                 color += 1
-            ch_data.plotOn(frame, RooFit.LineWidth(2),
-                           RooFit.LineColor(1),
-                           RooFit.DrawOption("ep")
-                          )
             canvas = ROOT.TCanvas("canvas", "canvas", 600, 600)
             frame.Draw()
+            frame.GetXaxis().SetTitle(xtitle)
+            legend.Draw()
             canvas.SaveAs(ch_name+"_overlay.pdf")
             obj = cat_iter()
             color += 1
 
-    def get_results(self, cut_value):
-       pass 
+    def get_eff(self, hist):
+        cut_bin = hist.FindBin(self.ISO_CUT)
+        num_bins = hist.GetNbinsX()
+        total_= hist.Integral(1, num_bins)
+        eff = hist.Integral(1, cut_bin)/total_
+        return  eff
+
+    def get_results(self):
+        print "Calo Iso cut: ", self.ISO_CUT
+        eff_gamma_leading = self.get_eff(self.gg_leading)
+        eff_gamma_subleading = self.get_eff(self.gg_subleading)
+        eff_jet_leading = self.get_eff(self.jj_leading)
+        eff_jet_subleading = self.get_eff(self.jj_subleading)
+        num_gg = self.ws.var("gg_events").getVal()
+        num_gj = self.ws.var("gj_events").getVal()
+        num_jg = self.ws.var("jg_events").getVal()
+        num_jj = self.ws.var("jj_events").getVal()
+        print "efficiency of #gamma: {:.3f} {:.3f}".format(
+            eff_gamma_leading, eff_gamma_subleading)
+        print "efficiency of jet: {:.3f} {:.3f}".format(
+            eff_jet_leading, eff_jet_subleading)
+        num_gg_sig = num_gg*eff_gamma_leading*eff_gamma_subleading
+        num_gj_sig = num_gj*eff_gamma_leading*eff_jet_subleading
+        num_jg_sig = num_jg*eff_jet_leading*eff_gamma_subleading
+        num_jj_sig = num_jj*eff_jet_leading*eff_jet_subleading
+        total_sig = num_gg_sig+num_gj_sig+num_jg_sig+num_jj_sig
+        print "In SR:"
+        print "\t gg: ", round(num_gg_sig,3), round(100*num_gg_sig/total_sig,1), "%"
+        print "\t gj: ", round(num_gj_sig,3), round(100*num_gj_sig/total_sig,1), "%"
+        print "\t jg: ", round(num_jg_sig,3), round(100*num_jg_sig/total_sig,1), "%"
+        print "\t jj: ", round(num_jj_sig,3), round(100*num_jj_sig/total_sig,1), "%"
 
 if __name__ == "__main__":
-    GG_FILENAME = "gg_template_sherpa.root"
-    JJ_FIELNAME = "jj_template.root"
-    DATA_FILENAME = "data_template.root"
+    GG_FILENAME = "gg_template_sherpa_low.root"
+    JJ_FIELNAME = "jj_template_1D_low.root"
+    DATA_FILENAME = "data_template_low.root"
     handle = HistHandler()
+    handle.ISO_CUT = 7.
     handle.process(GG_FILENAME, JJ_FIELNAME, DATA_FILENAME)
-    handle.fit_workspace()
+    #handle.fit_workspace()
