@@ -232,26 +232,28 @@ def test2():
 
 def get_mass1D(h1, name, start, end):
     h1_proj = h1.ProjectionX(name, start, end)
-    h1_proj.Rebin(2)
+    h1_proj.Sumw2()
+    #h1_proj.Rebin(2)
     h1_proj.Scale(1./h1_proj.Integral())
     return h1_proj
 
 def test3():
-    tag = "spin0"
+    tag = "spin2"
     f1 = ROOT.TFile.Open(tag+"_data.root")
     f2 = ROOT.TFile.Open(tag+"_sherpa.root")
     f3 = ROOT.TFile.Open(tag+"_pythia.root")
-    hist_names = [("mass_etabins","m_{#gamma#gamma} [GeV]", 1),
-                  ("h_leading_pt", "p_{0}^{T} [GeV]", 1),
-                  ("h_subleading_pt", "p_{1}^{T} [GeV]", 1),
-                  ("h_leading_eta", "|#eta_{0}|", 0),
-                  ("h_subleading_eta", "|#eta_{1}|", 0),
+    hist_names = [("mass_etabins","m_{#gamma#gamma} [GeV]", "Events / 5 GeV", 1),
+                  ("h_leading_pt", "leading p^{T} [GeV]", "Events / 2 GeV", 1),
+                  ("h_subleading_pt", "subleading p^{T} [GeV]", "Events / 2 GeV", 1),
+                  ("h_leading_eta", "leading #eta", "Events / 1", 0),
+                  ("h_subleading_eta", "subleading #eta", "Events / 1",  0),
                  ]
     labels = ROOT.std.vector('string')()
     labels.push_back("Data")
     labels.push_back("Sherpa")
     labels.push_back("Pythia")
-    for hist,x_title,is_log in hist_names:
+    for hist,x_title,y_title,is_log in hist_names:
+        print x_title, y_title, is_log
         h1 = f1.Get(hist)
         h2 = f2.Get(hist)
         h3 = f3.Get(hist)
@@ -265,7 +267,7 @@ def test3():
             list_all.Add(h2_all)
             list_all.Add(h3_all)
             ROOT.compare_hists(list_all, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
 
             # CC for 0.75
             h1_cc1 = get_mass1D(h1, tag+"_mass_cc0p75", 1, 1)
@@ -276,7 +278,7 @@ def test3():
             list_cc1.Add(h2_cc1)
             list_cc1.Add(h3_cc1)
             ROOT.compare_hists(list_cc1, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
             # other-than CC
             h1_other1 = get_mass1D(h1, tag+"_mass_other0p75", 2, 2)
             h2_other1 = get_mass1D(h2, tag+"_mass_other0p75_sherpa", 2, 2)
@@ -286,7 +288,7 @@ def test3():
             list_other1.Add(h2_other1)
             list_other1.Add(h3_other1)
             ROOT.compare_hists(list_other1, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
 
             # CC for 1.37
             h1_cc2 = get_mass1D(h1, tag+"_mass_cc1p37", 3, 3)
@@ -297,7 +299,7 @@ def test3():
             list_cc2.Add(h2_cc2)
             list_cc2.Add(h3_cc2)
             ROOT.compare_hists(list_cc2, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
             # other-than CC
             h1_other2 = get_mass1D(h1, tag+"_mass_other1p37", 4, 4)
             h2_other2 = get_mass1D(h2, tag+"_mass_other1p37_sherpa", 4, 4)
@@ -307,11 +309,12 @@ def test3():
             list_other2.Add(h2_other2)
             list_other2.Add(h3_other2)
             ROOT.compare_hists(list_other2, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
 
         else:
             histList = ROOT.TList()
             h1.SetName(tag+"_"+h1.GetName())
+            h1.Sumw2()
             if not "eta" in h1.GetName():
                 h1.Scale(1/h1.Integral())
                 h2.Scale(1/h2.Integral())
@@ -324,7 +327,7 @@ def test3():
             histList.Add(h2)
             histList.Add(h3)
             ROOT.compare_hists(histList, labels,
-                               x_title, is_log)
+                               x_title, y_title, is_log)
 
 
 if __name__ == "__main__":

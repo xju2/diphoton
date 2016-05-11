@@ -45,7 +45,8 @@ int abseta_bin(float abs_eta){
 int read_mxaod(
         const string& file_name,
         const string& out_name,
-        bool is_bkg, int cut_type = 0)
+        bool is_bkg, int cut_type = 0
+        )
 {
     cout << "file name: " << file_name << endl;
     cout << "out name: " << out_name << endl;
@@ -183,10 +184,10 @@ int read_mxaod(
             );
 
     // mass in different eta bins
-    int nbins_mass = 160;
-    float mass_low = 200, mass_hi = 1000;
+    int nbins_mass = 660;
+    float mass_low = 200, mass_hi = 3500;
     if(cut_type == 1) { // spin-2 selection
-        nbins_mass = 170;
+        nbins_mass = 670;
         mass_low = 150;
     }
     TH1F* mass = new TH1F("mass", "inv mass", nbins_mass, mass_low, mass_hi);
@@ -235,18 +236,23 @@ int read_mxaod(
             300, 0, 600
             );
 
-    double eta_bins[23] = {0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                        1.0, 1.1, 1.2, 1.37, 1.52, 1.62, 1.72, 1.82, 1.92, 2.02,
-                        2.12, 2.22, 2.37};
+    double eta_bins[45] = {
+        -2.37, -2.22, -2.12, -2.02, -1.92, -1.82, -1.72, -1.62, -1.52, -1.37,
+        -1.2, -1.1, -1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3,
+        -0.2, -0.1, 
+        0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        1.0, 1.1, 1.2, 1.37, 1.52, 1.62, 1.72, 1.82, 1.92, 2.02,
+        2.12, 2.22, 2.37
+    };
     TH1F* h_leading_eta = new TH1F(
             "h_leading_eta",
             "leading photon eta",
-            22, eta_bins
+            44, eta_bins
             );
     TH1F* h_subleading_eta = new TH1F(
             "h_subleading_eta",
             "subleading photon eta",
-            22, eta_bins);
+            44, eta_bins);
 
     cout<<"There are "<<tin->GetEntries()<<" events in total"<<endl;
 
@@ -333,8 +339,8 @@ int read_mxaod(
         // fill pT and eta
         h_leading_pt->Fill(pt->at(0)/1E3, weight_);
         h_subleading_pt->Fill(pt->at(1)/1E3, weight_);
-        h_leading_eta->Fill(abs(eta_s2->at(0)), weight_);
-        h_subleading_eta->Fill(abs(eta_s2->at(1)), weight_);
+        h_leading_eta->Fill(eta_s2->at(0), weight_);
+        h_subleading_eta->Fill(eta_s2->at(1), weight_);
         // fill mass in different eta bin
         if(abs(eta_s2->at(0)) < 0.75 && abs(eta_s2->at(1)) < 0.75) {
             mass_etabins->Fill(inv_mass, 0., weight_);
