@@ -159,6 +159,7 @@ def compare_ws_ws(f1_name, f2_name):
     legend.Draw()
     canvas.SaveAs(f1_name.replace("root", "pdf"))
 
+
 def compare_hist_hist(f1_name, f2_name, hist_name):
     f1 = ROOT.TFile.Open(f1_name, "read") # New
     f2 = ROOT.TFile.Open(f2_name, "read") # Old
@@ -188,9 +189,12 @@ def compare_hists(f1_name, f2_name, hist_name):
             h2 = f2.Get("h_isoshape")
         else:
             h2 = f2.Get("up")
+    elif "irreducible" in hist_name:
+        h2 = f2.Get("hreluncert_irreducible")
     else:
         h2 = f2.Get(hist_name)
     print "binning: ", h1.GetNbinsX(), h2.GetNbinsX()
+    print h2.GetName()
     sys_name = hist_name.split('_')[1]
     factor = 1.0
     is_log = False
@@ -226,6 +230,103 @@ def test2():
         f2 = "BkgEstimation_Lin/BkgEstimation_NONE_TOPO_PTDEP_"+pattern+"_Lin.root"
         compare_ws_hist(f1, f2)
 
+def get_mass1D(h1, name, start, end):
+    h1_proj = h1.ProjectionX(name, start, end)
+    h1_proj.Rebin(2)
+    h1_proj.Scale(1./h1_proj.Integral())
+    return h1_proj
+
+def test3():
+    tag = "spin0"
+    f1 = ROOT.TFile.Open(tag+"_data.root")
+    f2 = ROOT.TFile.Open(tag+"_sherpa.root")
+    f3 = ROOT.TFile.Open(tag+"_pythia.root")
+    hist_names = [("mass_etabins","m_{#gamma#gamma} [GeV]", 1),
+                  ("h_leading_pt", "p_{0}^{T} [GeV]", 1),
+                  ("h_subleading_pt", "p_{1}^{T} [GeV]", 1),
+                  ("h_leading_eta", "|#eta_{0}|", 0),
+                  ("h_subleading_eta", "|#eta_{1}|", 0),
+                 ]
+    labels = ROOT.std.vector('string')()
+    labels.push_back("Data")
+    labels.push_back("Sherpa")
+    labels.push_back("Pythia")
+    for hist,x_title,is_log in hist_names:
+        h1 = f1.Get(hist)
+        h2 = f2.Get(hist)
+        h3 = f3.Get(hist)
+        if "mass_etabins" in hist:
+            # CC for 0.75
+            h1_all = get_mass1D(h1, tag+"_mass_all", 1, 2)
+            h2_all = get_mass1D(h2, tag+"_mass_all_sherpa", 1, 2)
+            h3_all = get_mass1D(h3, tag+"_mass_all_pythia", 1, 2)
+            list_all = ROOT.TList()
+            list_all.Add(h1_all)
+            list_all.Add(h2_all)
+            list_all.Add(h3_all)
+            ROOT.compare_hists(list_all, labels,
+                               x_title, is_log)
+
+            # CC for 0.75
+            h1_cc1 = get_mass1D(h1, tag+"_mass_cc0p75", 1, 1)
+            h2_cc1 = get_mass1D(h2, tag+"_mass_cc0p75_sherpa", 1, 1)
+            h3_cc1 = get_mass1D(h3, tag+"_mass_cc0p75_pythia", 1, 1)
+            list_cc1 = ROOT.TList()
+            list_cc1.Add(h1_cc1)
+            list_cc1.Add(h2_cc1)
+            list_cc1.Add(h3_cc1)
+            ROOT.compare_hists(list_cc1, labels,
+                               x_title, is_log)
+            # other-than CC
+            h1_other1 = get_mass1D(h1, tag+"_mass_other0p75", 2, 2)
+            h2_other1 = get_mass1D(h2, tag+"_mass_other0p75_sherpa", 2, 2)
+            h3_other1 = get_mass1D(h3, tag+"_mass_other0p75_pythia", 2, 2)
+            list_other1 = ROOT.TList()
+            list_other1.Add(h1_other1)
+            list_other1.Add(h2_other1)
+            list_other1.Add(h3_other1)
+            ROOT.compare_hists(list_other1, labels,
+                               x_title, is_log)
+
+            # CC for 1.37
+            h1_cc2 = get_mass1D(h1, tag+"_mass_cc1p37", 3, 3)
+            h2_cc2 = get_mass1D(h2, tag+"_mass_cc1p37_sherpa", 3, 3)
+            h3_cc2 = get_mass1D(h3, tag+"_mass_cc1p37_pythia", 3, 3)
+            list_cc2 = ROOT.TList()
+            list_cc2.Add(h1_cc2)
+            list_cc2.Add(h2_cc2)
+            list_cc2.Add(h3_cc2)
+            ROOT.compare_hists(list_cc2, labels,
+                               x_title, is_log)
+            # other-than CC
+            h1_other2 = get_mass1D(h1, tag+"_mass_other1p37", 4, 4)
+            h2_other2 = get_mass1D(h2, tag+"_mass_other1p37_sherpa", 4, 4)
+            h3_other2 = get_mass1D(h3, tag+"_mass_other1p37_pythia", 4, 4)
+            list_other2 = ROOT.TList()
+            list_other2.Add(h1_other2)
+            list_other2.Add(h2_other2)
+            list_other2.Add(h3_other2)
+            ROOT.compare_hists(list_other2, labels,
+                               x_title, is_log)
+
+        else:
+            histList = ROOT.TList()
+            h1.SetName(tag+"_"+h1.GetName())
+            if not "eta" in h1.GetName():
+                h1.Scale(1/h1.Integral())
+                h2.Scale(1/h2.Integral())
+                h3.Scale(1/h3.Integral())
+            else:
+                h1.Scale(1/h1.Integral("width"), "width")
+                h2.Scale(1/h2.Integral("width"), "width")
+                h3.Scale(1/h3.Integral("width"), "width")
+            histList.Add(h1)
+            histList.Add(h2)
+            histList.Add(h3)
+            ROOT.compare_hists(histList, labels,
+                               x_title, is_log)
+
+
 if __name__ == "__main__":
     #test1()
     #compare_ws_ws("bkg_histFitter_ws_8tev.root",
@@ -245,7 +346,9 @@ if __name__ == "__main__":
     #    "/Users/xju/work/diphoton/bkg_histofactory_13TeV/inputs/BkgEstimation_Lin/isolation_shapevariation.root",
     #    "h_isoshape"
     #)
-    if len(sys.argv) < 3:
-        print sys.argv[0]," f1_name f2_name hist_name"
-        sys.exit(1)
-    compare_hists(sys.argv[1], sys.argv[2], sys.argv[3])
+    #if len(sys.argv) < 3:
+        #print sys.argv[0]," f1_name f2_name hist_name"
+        #sys.exit(1)
+    #compare_hists(sys.argv[1], sys.argv[2], sys.argv[3])
+
+    test3()

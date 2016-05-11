@@ -33,7 +33,7 @@ def get_template(file_name, out_name, cut):
         "HGamEventInfoAuxDyn.isPassedPreselection &&"
         "HGamEventInfoAuxDyn.isPassedlPtCutsExotic &&"
         "HGamEventInfoAuxDyn.isPassedPID && "
-        "HGamEventInfoAuxDyn.m_yy >= 250E3 && "
+        "HGamEventInfoAuxDyn.m_yy >= 150E3 && "
         "HGamEventInfoAuxDyn.m_yy < 400E3"
     )
     tree = ROOT.loader(file_name, TREE_NAME)
@@ -49,13 +49,6 @@ def get_template(file_name, out_name, cut):
     tree.Draw(subleading_iso+">>subleading_jet",
               "("+analysis_cuts+"&&"+cut+"[1])*"+weight)
 
-    # leading isolation
-    leading_iso = ROOT.TH1F("leading_iso", "leading isolation", 50, -10, 15)
-    subleading_iso = ROOT.TH1F("subleading_iso", "subleading isolation", 50, -10, 15)
-    tree.Draw("HGamPhotonsAuxDyn.topoetcone40[0]/1E3>>leading_iso",
-              "("+analysis_cuts+"&&"+cut+"[0])*"+weight)
-    tree.Draw("HGamPhotonsAuxDyn.topoetcone40[1]/1E3>>subleading_iso",
-              "("+analysis_cuts+"&&"+cut+"[1])*"+weight)
 
     # invariant mass
     mass = ROOT.TH1F("mass", "inv mass", 670, 150, 3500)
@@ -65,8 +58,6 @@ def get_template(file_name, out_name, cut):
     fout = ROOT.TFile.Open(out_name, "recreate")
     leading_jet.Write()
     subleading_jet.Write()
-    leading_iso.Write()
-    subleading_iso.Write()
     mass.Write()
     fout.Close()
     print out_name, " is written"
@@ -78,5 +69,4 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print sys.argv[0], " file_name"
         sys.exit(1)
-    #get_template("sample_data.txt", "data_template.root", "HGamPhotonsAuxDyn.isTight")
     get_template(sys.argv[1], "output_template.root", "HGamPhotonsAuxDyn.isTight")
