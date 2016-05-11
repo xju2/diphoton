@@ -262,7 +262,7 @@ int read_mxaod(
         tin->GetEntry(i);
         // printf("|%i|\n", isPassedPID);
         if( !isPassedPreselection ||
-            m_yy < mass_low*1E3
+            m_yy <= mass_low*1E3
           ) continue;
         bool event_cut = false;
         float leading_iso = etcone40->at(0)/1E3 - pt->at(0)*0.022/1E3;
@@ -274,9 +274,9 @@ int read_mxaod(
         bool pass_spin0_EK = pt->at(0)/m_yy > 0.4 && pt->at(1)/m_yy > 0.3;
 
         if (cut_type == 2) { // spin2 selections
-            event_cut = pass_spin2_EK && pass_iso;
+            event_cut = pass_spin2_EK && pass_iso && isPassedPID;
         } else if (cut_type == 1) {
-            event_cut = pass_spin0_EK && pass_iso;
+            event_cut = pass_spin0_EK && pass_iso && isPassedPID;
         } else {
             event_cut = (is_bkg && !isPassedPID && pass_spin2_EK) || (!is_bkg && isPassedPID && pass_spin2_EK);
         }
